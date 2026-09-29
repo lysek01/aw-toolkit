@@ -115,8 +115,8 @@ list nor show the path in their title.
 `UserPromptSubmit` remembers the start and your prompt, `Stop` writes the event:
 
 ```json
-{"app": "Claude", "title": "Monitoring productivity at work", "prompt": "add a --once flag",
- "first_prompt": "I'd like to track my work…", "cwd": "C:\\Users\\me\\project", "session_id": "…"}
+{"app": "Claude", "title": "Refactor config loader", "prompt": "add a --once flag",
+ "first_prompt": "The config loader ignores env overrides…", "cwd": "C:\\Users\\me\\project", "session_id": "…"}
 ```
 
 `title` is the session name from the Claude Code app sidebar. Harness messages (`<task-notification>` …)

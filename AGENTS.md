@@ -93,8 +93,3 @@ it lists window titles that could not be mapped, per process name):
 
 **Change detection logic of the popup:** it is the pure class `AwayDetector` - extend `tests/test_away.py`
 with the scenario first.
-
-## Commits
-
-Small, focused commits with a plain descriptive message. Do not add AI attribution lines
-(`Co-Authored-By: …`, "Generated with …") unless the maintainer asks for it.
