@@ -1,0 +1,19 @@
+# Copy to config.toml (next to aw_watcher_output.py) and edit. Every key is optional.
+
+# aw_url = "http://localhost:5600/api/0"
+
+poll_s = 30              # how often to check the active window
+flush_s = 300            # how often to write a summary event to ActivityWatch
+git_check_s = 60         # how often to look for new commits in watched repos
+max_watched = 6          # how many project folders to watch at once
+forget_after_min = 120   # stop watching a project after this long without activity
+fallback_poll_s = 120    # rescan interval for folders without change notifications (some NAS)
+
+# Extra process names to never map to a project
+# ignore_apps = ["slack.exe", "signal.exe"]
+
+# Extra folder names to ignore inside projects (generated output etc.)
+# ignore_dirs = ["output", "gerbers"]
+
+# Extra folders that are never a project on their own (~ = your home folder)
+# non_project_dirs = ["~/Scratch", "D:/Inbox"]

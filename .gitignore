@@ -1,0 +1,6 @@
+# personal data and settings
+data/
+config.toml
+
+__pycache__/
+*.pyc

@@ -1,0 +1,10 @@
+# %LOCALAPPDATA%\activitywatch\activitywatch\aw-qt\aw-qt.toml
+# Modules aw-qt starts on launch. aw-watcher-input is bundled but not started by default.
+# Leave out aw-notify on Windows (see docs/windows-gotchas.md) and never run aw-server and
+# aw-server-rust together.
+
+[aw-qt]
+autostart_modules = ["aw-server", "aw-watcher-afk", "aw-watcher-window", "aw-watcher-input"]
+
+[aw-qt-testing]
+#autostart_modules = ["aw-server", "aw-watcher-afk", "aw-watcher-window"]

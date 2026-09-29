@@ -1,0 +1,19 @@
+# Copy to config.toml (next to aw_watcher_away.py) and edit. Every key is optional.
+
+# aw_url = "http://localhost:5600/api/0"
+
+# UI language: "auto" (follows Windows), "en" or "cs"
+language = "auto"
+
+# Ask only after you have been away at least this many minutes
+threshold_min = 10
+
+# The popup closes by itself after this many seconds if the field stays empty
+autoclose_s = 120
+
+# How many previous answers to keep for the Up/Down history
+history_size = 50
+
+# One-click answers. Icon: "coffee", "food", "pause" or "none".
+# Leave it out to get the language default (break/lunch, pauza/oběd).
+# quick_buttons = [["break", "coffee"], ["lunch", "food"], ["lab", "none"]]
