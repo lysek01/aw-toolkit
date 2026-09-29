@@ -18,7 +18,8 @@ from pathlib import Path
 
 AW = os.environ.get("AW_URL", "http://localhost:5600/api/0")
 BUCKET = f"aw-watcher-claude_{socket.gethostname()}"
-STATE_DIR = Path(os.environ.get("AW_CLAUDE_HOOK_STATE", Path.home() / ".claude" / "hooks" / "aw_state"))
+# per-session state (start time, prompts); lives with the installed copy in ~/.aw-toolkit
+STATE_DIR = Path(os.environ.get("AW_CLAUDE_HOOK_STATE", Path.home() / ".aw-toolkit" / "claude-code" / "state"))
 TIMEOUT_S = 0.5
 
 

@@ -30,11 +30,25 @@ cd aw-toolkit
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-`install.ps1` puts both watchers into your Startup folder (started via `pythonw`, no console window),
-starts them, registers the Claude Code hook if `~/.claude` exists, and enables `aw-watcher-input`
-in `aw-qt.toml` unless you already manage `autostart_modules` yourself.
-Skip parts with `-NoAway`, `-NoOutput`, `-NoClaudeHook`, `-NoAwQt`.
-Run it again after `git pull` to update; `uninstall.ps1` reverts everything except your data.
+`install.ps1` copies the watchers and the hook to **`~\.aw-toolkit\`** and runs them from there, so the
+cloned repository can be moved or deleted afterwards. It puts both watchers into your Startup folder
+(started via `pythonw`, no console window), starts them, registers the Claude Code hook if `~/.claude`
+exists, and enables `aw-watcher-input` in `aw-qt.toml` unless you already manage `autostart_modules` yourself.
+Skip parts with `-NoAway`, `-NoOutput`, `-NoClaudeHook`, `-NoAwQt`; pick another folder with `-InstallDir`.
+
+```
+~\.aw-toolkit\
+├─ INSTALL-INFO.txt       which repo/commit is installed
+├─ uninstall.ps1          works even without the repository
+├─ aw-watcher-away\       code, config.toml, data\
+├─ aw-watcher-output\     code, config.toml, data\
+└─ claude-code\           hook, state\
+```
+
+**Update:** `git pull` (or your own changes), then run `install.ps1` again - code is replaced, your
+`config.toml` and `data\` stay. **Remove:** `~\.aw-toolkit\uninstall.ps1` (add `-Purge` to delete the
+folder with your data too). Settings go into `config.toml` next to the installed script - copy it from
+`config.example.toml` in the same folder.
 
 In the ActivityWatch web UI the new buckets appear as their own rows in **Timeline**.
 The *Activity* view only knows window/web/AFK buckets, so it won't show them - use the
@@ -89,7 +103,7 @@ Every 5 minutes one event per project:
 Measured cost: ~0 % CPU, ~37 MB RAM (the Python runtime itself).
 
 `python watchers\aw-watcher-output\aw_watcher_output.py --once` shows which project the current window maps to.
-Windows that could not be mapped are counted in `data\unmatched.json` - a good hint for which source
+Windows that could not be mapped are counted in `~\.aw-toolkit\aw-watcher-output\data\unmatched.json` - a good hint for which source
 to add next. Settings: [config.example.toml](watchers/aw-watcher-output/config.example.toml).
 
 **Not covered yet:** files opened in VS Code without a folder, documents that live directly in
@@ -113,11 +127,15 @@ isn't running, so it can't slow down or break Claude Code. Manual setup:
 ## Data & privacy
 
 All data goes to your local ActivityWatch only. Each watcher keeps small helper files in its own `data\`
-folder (answer history, events queued while ActivityWatch was down, a log) - ignored by git.
+folder inside `~\.aw-toolkit` (answer history, events queued while ActivityWatch was down, a log) -
+never in the repository.
 The output watcher stores file paths and commit messages; the Claude hook stores the first line of your
 prompts. Keep that in mind before syncing or exporting your ActivityWatch database.
 
-## Tests
+## Development
+
+Working on the code - or letting an AI agent do it? Start with [AGENTS.md](AGENTS.md): architecture,
+the repository-vs-installed-copy layout, rules and common tasks. Tests:
 
 ```powershell
 cd tests
