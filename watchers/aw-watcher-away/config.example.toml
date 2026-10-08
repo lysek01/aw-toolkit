@@ -11,6 +11,11 @@ threshold_min = 10
 # The popup closes by itself after this many seconds if the field stays empty
 autoclose_s = 120
 
+# Nights are recorded without asking: an absence of at least night_min_hours that spans
+# night_hour o'clock is stored as status "auto". Set night_hour = -1 to always ask.
+night_hour = 3
+night_min_hours = 4
+
 # How many previous answers to keep for the Up/Down history
 history_size = 50
 

@@ -57,8 +57,9 @@ NON_PROJECT_DIRS = {HOME, HOME / "Downloads", HOME / "Desktop", HOME / "Document
 MARKERS = ("platformio.ini", "package.json", "pyproject.toml", "CMakeLists.txt", "composer.json", "Cargo.toml")
 IGNORE_PARTS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".pio", "build", "dist",
                 ".vs", ".vscode", ".idea", ".history", ".cache", "obj", "bin"}
-IGNORE_SUFFIX = (".lck", ".tmp", ".bak", ".swp", ".kicad_prl", ".log", ".pyc", ".o", ".d", ".obj")
-IGNORE_NAMES = {"fp-info-cache", "_autosave", "desktop.ini", "thumbs.db"}
+IGNORE_SUFFIX = (".lck", ".tmp", ".dtmp", ".bak", ".swp", ".kicad_prl", ".log", ".pyc", ".o", ".d", ".obj")
+IGNORE_PREFIX = ("~", ".#", ".$", "_autosave")  # Office/Emacs/draw.io temp files, KiCad autosave
+IGNORE_NAMES = {"fp-info-cache", "desktop.ini", "thumbs.db"}
 
 
 def load_config():
@@ -250,6 +251,46 @@ def best_name_match(title, paths, name_of):
     return max(hits, key=lambda p: len(name_of(p)), default=None)
 
 
+def norm_drive(path):
+    """Same folder, different spelling of the drive letter: always use upper case, so one
+    project doesn't show up twice (Arduino IDE writes file:///c%3A/...)."""
+    if path is None:
+        return None
+    s = str(path)
+    return Path(s[0].upper() + s[1:]) if len(s) > 1 and s[1] == ":" else Path(s)
+
+
+def sketch_bases():
+    """Where to look for an Arduino sketch that is not in the IDE's (10 entry, lazily written) recent list:
+    the projects of the sketches that are, plus the default sketchbook."""
+    bases = {HOME / "Documents" / "Arduino"}
+    for p in ARDUINO.get():
+        bases.add(project_root(norm_drive(p)) or norm_drive(p).parent)
+    return [b for b in bases if b.is_dir()]
+
+
+_sketch_cache = {}  # name -> (folder or None, time found)
+
+
+def find_sketch(name, bases, max_depth=6, miss_ttl=600):
+    """Folder `name` containing `name`.ino somewhere under `bases`. Misses are remembered for a while."""
+    hit = _sketch_cache.get(name)
+    if hit and (hit[0] or time.time() - hit[1] < miss_ttl):
+        return hit[0]
+    found = None
+    for base in bases:
+        for dirpath, dirnames, filenames in os.walk(base):
+            depth = len(Path(dirpath).relative_to(base).parts)
+            dirnames[:] = [] if depth >= max_depth else [d for d in dirnames if d not in IGNORE_PARTS]
+            if os.path.basename(dirpath) == name and f"{name}.ino" in filenames:
+                found = Path(dirpath)
+                break
+        if found:
+            break
+    _sketch_cache[name] = (found, time.time())
+    return found
+
+
 def resolve(app, title):
     """Folder behind the window, or None."""
     a = app.lower()
@@ -257,16 +298,19 @@ def resolve(app, title):
         return None
     if "kicad" in a or "eeschema" in a or "pcbnew" in a:
         p = best_name_match(title, KICAD.get(), lambda p: p.stem)
-        return p.parent if p else None
+        return norm_drive(p.parent) if p else None
     if "arduino" in a:
-        return best_name_match(title, ARDUINO.get(), lambda p: p.name)
+        p = best_name_match(title, ARDUINO.get(), lambda p: p.name)
+        if p is None and " | " in title:  # "<sketch> | Arduino IDE 2.x"
+            p = find_sketch(title.split(" | ")[0].strip(), sketch_bases())
+        return norm_drive(p)
     if a == "code.exe":
-        return best_name_match(title, VSCODE.get(), lambda p: p.name)
+        return norm_drive(best_name_match(title, VSCODE.get(), lambda p: p.name))
     recent = RECENT.get()
     recent = recent[0] if recent else {}
     t = title.lower()
     hits = [name for name in recent if name in t]
-    return recent[max(hits, key=len)].parent if hits else None
+    return norm_drive(recent[max(hits, key=len)].parent) if hits else None
 
 
 @functools.lru_cache(maxsize=256)
@@ -301,7 +345,8 @@ def interesting(rel):
     name = parts[-1].lower() if parts else ""
     if any(p in IGNORE_PARTS or p.endswith("-backups") for p in parts[:-1]):
         return False
-    return not (name in IGNORE_NAMES or name.startswith(("~", ".#", "~$")) or name.endswith(IGNORE_SUFFIX))
+    return not (name in IGNORE_NAMES or name.startswith(IGNORE_PREFIX) or name.endswith(IGNORE_SUFFIX)
+                or ".tmp." in name)  # Arduino IDE writes sketch.ino.tmp.<pid>.<hash>
 
 
 class FolderWatch:

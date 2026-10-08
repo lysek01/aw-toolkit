@@ -61,10 +61,14 @@ Asks after **10+ minutes** away - no input, locked screen (exact lock time) or s
 Up/Down browse earlier answers. Left untouched, it closes after 2 minutes and records `timeout`.
 The countdown pauses while there is text in the field.
 
+It only opens once you actually touch the keyboard or mouse again (a PC that woke up by itself
+doesn't ask an empty chair), and it doesn't ask about nights: an absence of 4+ hours that spans
+3 a.m. is recorded as `auto`.
+
 ```jsonc
 // event data
 {"message": "lab measurements", "status": "answered", "reason": "locked"}
-// status: answered | skipped | timeout      reason: idle | locked | sleep
+// status: answered | skipped | timeout | auto (night, not asked)      reason: idle | locked | sleep
 ```
 
 Try the popup without waiting: `python watchers\aw-watcher-away\aw_watcher_away.py --test`

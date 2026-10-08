@@ -58,8 +58,47 @@ class FilterTest(unittest.TestCase):
 
     def test_noise_is_ignored(self):
         for p in ["hw/board.kicad_prl", "hw/board-backups/x.zip", ".git/index", "node_modules/a/b.js",
-                  "~$report.docx", "build/fw.o", "fp-info-cache", "src/__pycache__/m.pyc"]:
+                  "~$report.docx", "build/fw.o", "fp-info-cache", "src/__pycache__/m.pyc",
+                  "src/gw/gw.ino.tmp.15932.450f0f9c0084",  # Arduino IDE save
+                  "_autosave-board.kicad_pcb", ".$diagram.drawio.dtmp"]:
             self.assertFalse(out.interesting(p), p)
+
+
+class DriveLetterTest(unittest.TestCase):
+    def test_lower_case_drive_is_the_same_project(self):
+        self.assertEqual(out.norm_drive(Path("c:/Users/me/repo")), out.norm_drive(Path("C:/Users/me/repo")))
+        self.assertEqual(str(out.norm_drive(Path("c:/x")))[0], "C")
+
+    def test_unc_and_none_pass_through(self):
+        self.assertEqual(out.norm_drive(Path(r"\\nas\share\x")), Path(r"\\nas\share\x"))
+        self.assertIsNone(out.norm_drive(None))
+
+
+class SketchSearchTest(unittest.TestCase):
+    def setUp(self):
+        out._sketch_cache.clear()
+        self.base = Path(tempfile.mkdtemp())
+        sketch = self.base / "src" / "node" / "LoRa_TX"
+        sketch.mkdir(parents=True)
+        (sketch / "LoRa_TX.ino").write_text("void setup(){}")
+        (self.base / "build" / "LoRa_RX").mkdir(parents=True)  # ignored folder, no .ino anyway
+
+    def test_finds_sketch_folder_by_name(self):
+        self.assertEqual(out.find_sketch("LoRa_TX", [self.base]), self.base / "src" / "node" / "LoRa_TX")
+
+    def test_miss_is_cached_and_serial_monitor_title_is_harmless(self):
+        self.assertIsNone(out.find_sketch("COM6", [self.base]))
+        self.assertIn("COM6", out._sketch_cache)
+
+    def test_arduino_window_not_in_recent_list(self):
+        saved = out.ARDUINO, out.sketch_bases
+        out.ARDUINO = ResolveTest.Fixed([])
+        out.sketch_bases = lambda: [self.base]
+        try:
+            self.assertEqual(out.resolve("Arduino IDE.exe", "LoRa_TX | Arduino IDE 2.3.6"),
+                             out.norm_drive(self.base / "src" / "node" / "LoRa_TX"))
+        finally:
+            out.ARDUINO, out.sketch_bases = saved
 
 
 class ProjectRootTest(unittest.TestCase):

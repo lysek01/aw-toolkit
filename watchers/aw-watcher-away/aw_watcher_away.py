@@ -18,7 +18,7 @@ import tomllib
 import urllib.error
 import urllib.request
 from ctypes import wintypes
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -30,16 +30,18 @@ DEFAULTS = {
     "language": "auto",        # auto | en | cs
     "threshold_min": 10,       # ask only after being away at least this long
     "autoclose_s": 120,        # popup closes by itself if left untouched
+    "night_hour": 3,           # absences spanning this hour (and >= night_min_hours) are not asked about; -1 = always ask
+    "night_min_hours": 4,
     "history_size": 50,
     "quick_buttons": None,     # [["label", "icon"], ...]; icon: coffee | food | pause | none
 }
 
 TEXTS = {
-    "en": {"title": "Welcome back", "idle": "away", "locked": "locked", "sleep": "asleep",
+    "en": {"title": "Welcome back", "idle": "away", "locked": "locked", "sleep": "asleep", "night": "night",
            "hint": "Want to jot down what it was?", "save": "Save",
            "footer": "Enter saves  ·  Esc skips  ·  ↑↓ history",
            "quick": [["break", "coffee"], ["lunch", "food"]]},
-    "cs": {"title": "Vítej zpátky", "idle": "mimo", "locked": "zamčeno", "sleep": "v režimu spánku",
+    "cs": {"title": "Vítej zpátky", "idle": "mimo", "locked": "zamčeno", "sleep": "v režimu spánku", "night": "noc",
            "hint": "Chceš si k tomu něco poznamenat?", "save": "Uložit",
            "footer": "Enter uloží  ·  Esc přeskočí  ·  ↑↓ historie",
            "quick": [["pauza", "coffee"], ["oběd", "food"]]},
@@ -99,7 +101,12 @@ def screen_locked():
 
 class AwayDetector:
     """Pure state machine: feed it (now, last_input, locked) every few seconds, it returns
-    (start, end, reason) once you are back after being away for at least `threshold` seconds."""
+    (start, end, reason) once you are back after being away for at least `threshold` seconds.
+
+    "Back" means there was real input: after an unlock or wake-up nothing is reported until a key or
+    the mouse is touched, so the popup never opens for an empty chair (a PC that woke up by itself)."""
+
+    INPUT_SLACK = 10  # s: the keystrokes that unlocked the screen happen just before we see it unlocked
 
     def __init__(self, threshold, now, last_input):
         self.threshold = threshold
@@ -107,34 +114,53 @@ class AwayDetector:
         self.last_step = now
         self.away_start = None
         self.reason = None
+        self.back_at = None  # when the screen was first seen unlocked/awake again
 
     def step(self, now, last_input, locked):
         if now - self.last_step > self.threshold:  # the loop stood still -> machine was asleep
             self.away_start = self.away_start or self.prev_input
             self.reason = "sleep"
+            self.back_at = None
         self.last_step = now
 
         if locked:  # never ask while locked, the popup would be hidden behind the lock screen
             if self.away_start is None:
                 self.away_start, self.reason = self.prev_input, "locked"
+            self.back_at = None
             return None
 
-        if self.away_start is not None:  # just unlocked / woke up
-            start, reason = self.away_start, self.reason
-            self.away_start = self.reason = None
-            self.prev_input = max(last_input, start)
-            return (start, now, reason) if now - start >= self.threshold else None
+        if self.away_start is not None:  # unlocked / awake again
+            if self.back_at is None:
+                self.back_at = now
+            if last_input < self.back_at - self.INPUT_SLACK:
+                return None  # nobody has touched anything yet - keep waiting
+            start, end, reason = self.away_start, self.back_at, self.reason
+            self.away_start = self.reason = self.back_at = None
+            self.prev_input = max(last_input, end)
+            return (start, end, reason) if end - start >= self.threshold else None
 
         event = None
         if last_input - self.prev_input >= self.threshold:  # input again after a long pause
             event = (self.prev_input, last_input, "idle")
-        self.prev_input = last_input
+        self.prev_input = max(last_input, self.prev_input)
         return event
 
     def resync(self, now, last_input):
-        """Call after the (blocking) popup closes."""
+        """Call after the (blocking) popup closes. Never moves prev_input back, otherwise the
+        absence that was just reported would be reported again on the next input."""
         self.last_step = now
-        self.prev_input = last_input
+        self.prev_input = max(last_input, self.prev_input)
+
+
+def is_night(start, end, night_hour, min_hours):
+    """True for an absence of at least `min_hours` that spans `night_hour` o'clock local time.
+    Such absences are recorded without asking. night_hour < 0 disables the rule."""
+    if night_hour < 0 or end - start < min_hours * 3600:
+        return False
+    t = datetime.fromtimestamp(start).replace(hour=night_hour, minute=0, second=0, microsecond=0)
+    if t.timestamp() <= start:
+        t += timedelta(days=1)
+    return t.timestamp() < end
 
 
 # --- ActivityWatch ------------------------------------------------------------------
@@ -401,7 +427,10 @@ def ask(start, end, reason):
 
 
 def record(start, end, reason):
-    text, status = ask(start, end, reason)
+    if is_night(start, end, CFG["night_hour"], CFG["night_min_hours"]):
+        text, status = CFG["texts"]["night"], "auto"  # nobody wants to explain the night every morning
+    else:
+        text, status = ask(start, end, reason)
     send({
         "timestamp": datetime.fromtimestamp(start, timezone.utc).isoformat(),
         "duration": round(end - start, 1),
